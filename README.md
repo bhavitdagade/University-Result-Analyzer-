@@ -6,3 +6,4 @@ Developed "University Result Analyzer" . Pune University(SPPU) sends  a PDF file
 2)Show overall toppers and subject toppers.
 3)Number of students  passed and failed in particular subject. 
 4)Total Result of Subject and Average Score of Subject.
+which would eventually automate the process and stop the tedious task done by result coordinator of Department.
