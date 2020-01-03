@@ -1,0 +1,684 @@
+import PyPDF2                      #FOR Reading the text from PDF (reads character by character)
+
+import MySQLdb as my                #library for database connection,insertion,fetching,etc
+                                    #library for GUI
+from tkinter import *
+from tkinter import messagebox
+from tkinter.ttk import  Combobox
+                                    #libraries for plotting bargrpah
+from matplotlib import *
+import matplotlib.pyplot as plt
+from pylab import  plot,show,xlabel,ylabel
+
+
+database = "abc"         #name of database
+password = "bhavitdbms"  #PASSWORD of databse
+
+
+class resultAnalysis:
+    pdf_path_string =""   #stores path of Pdf
+    identifcationMark_string =""#identification mark as F15,S15,T15
+    subjectFilePath_string = ""#subject File Path
+    sub_code_list_1 = []   #stores subjectcodes
+    sub_name_list_1 = []    #stores subject list 1
+    roll_name_sgpa = []
+    code_name = []          #list of list for storing subject code  and subject name
+    ptr = 0                 #pointer to point charracters in pdf
+    sample = ""
+    sgpa_string =""         #stores SGPA
+    asd = "ROLLNO"          #name of Column in rollnamesgpa table
+    sub = [[], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []]#list of list for storing lists of Student Name and his Marks
+    table_names = []
+    get_result = -1;
+    result_list = []    #result_list is list for storing the Result of each subject in percentage
+
+    # read the File containing Subjectocode and subject names
+    def open_readfile(self):
+        with open(self.subjectFilePath_string, "rt") as myfile:
+            data_string = myfile.read().replace('\n', '') #converted to string
+
+        data_list = data_string.split(':') #converted to  list witout :
+
+        for i, val in enumerate(data_list):
+            if i % 2 == 0:
+                self.sub_code_list_1.append(val)#inserting subject code
+            else:
+                self.sub_name_list_1.append(val)#inserting Subject Name
+
+        self.sub_code_list_1.pop()#pop because last element contains space
+
+        b = []
+        for i,val in enumerate(self.sub_code_list_1) :
+             a = []
+             a.append(self.sub_code_list_1[i])
+             a.append(self.sub_name_list_1[i])
+             b.append(a)            #b is list of list conatains subjectcode and subject name
+             del a
+
+        self.code_name = b.copy()   #b is copied and inserted in list of list names code_name
+
+    def read_PDF_details(self):
+        pdfFileObj = open(self.pdf_path_string, 'rb')#syntax for reading PDF FILES
+        pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
+
+        db = my.connect(host="localhost",user= "root", passwd=password,database="abc")
+        cursor = db.cursor()
+
+        b = []
+        for x in range(0, pdfReader.numPages):  # pdfReader.numPages = Gives Number of Pages
+            pageObj = pdfReader.getPage(x)  # pdfReader.getPage = Getting Particular Page  #creating a page object
+
+            data = pageObj.extractText()  # extracting text from page
+            self.ptr = 0
+            # obj = pagedata()  # Object Of Class pagdata
+            no = self.get_no(data)  # get Roll number of Particular Student
+
+            if no != -1:
+                print(' ')
+                print(' ')
+                print(no, end=' ')  # end is used in python to not to go on newLine
+                nan = self.get_name(data)  # get the Name of Student
+                print(nan)
+                z = []
+                # self.insert_into_table.clear()
+                z.append(no)
+                z.append(nan)
+
+                for n in range(0, len(self.sub_code_list_1)):  # Run till no of Subjects
+                    print("      ", end=' ')
+                    print(self.sub_name_list_1[n], end=' ')  # print Subject Name
+                    print("  ", end=' ')
+                    mr = self.get_marks(data, self.sub_code_list_1[n])#get marks of subk=ject present in subject
+                    if mr != -1:
+                        # strs = "f"
+                        # strs += self.sub_code_list_1[n]
+                        # strs += self.sub_name_list_1[n]
+                        # sql = "INSERT INTO "+strs+"(RollNo, Marks) VALUES (%s, %s)"
+                        # val = (no, mr)
+                        # cursor.execute(sql, val)
+                        a = []
+                        a.append(nan)
+                        a.append(mr)
+                        self.sub[n].append(a)
+                        del a
+
+                    print(mr)  # printting Marks
+
+                print("      ", end=' ')
+                print("SGPA", end=' : ')
+                studentSgpaReturned = self.get_SGPA(data)
+                print(studentSgpaReturned)
+                z.append(studentSgpaReturned)
+                b.append(z)
+                del z
+                # same Logic For Second Half Of Page i.e other student on Same Page
+                no = self.get_no(data)
+
+                if no != -1:
+                    print(' ')
+                    print(' ')
+                    print(no, end=' ')
+                    nan = self.get_name(data)
+                    print(nan)
+                    # self.insert_into_table.clear()
+                    z = []
+                    z.append(no)
+                    z.append(nan)
+
+
+                    for n in range(0, len(self.sub_name_list_1)):
+                        print("      ", end=' ')
+                        print(self.sub_name_list_1[n], end=' ')
+                        print("  ", end=' ')
+                        mr = self.get_marks(data, self.sub_code_list_1[n])
+                        if mr != -1:
+                            # strs = "f"
+                            # strs += self.sub_code_list_1[n]
+                            # strs += self.sub_name_list_1[n]
+                            # sql = "INSERT INTO " + strs + "(RollNo, Marks) VALUES (%s, %s)"
+                            # val = (no, mr)
+                            # cursor.execute(sql, val)
+                            a = []
+                            a.append(nan)
+                            a.append(mr)
+                            self.sub[n].append(a)
+                            del a
+
+                        print(mr)
+                    print("      ", end=' ')
+                    print("SGPA", end=' : ')
+                    studentSgpaReturned = self.get_SGPA(data)
+                    print(studentSgpaReturned)
+                    z.append(studentSgpaReturned)
+                    b.append(z)
+                    del z
+        pdfFileObj.close()
+
+        self.roll_name_sgpa = b.copy()# store roll no name and SGPA
+        db.commit()
+        db.close()
+
+    #create tables subcodename and rollnamesgpa
+    def createTable(self):
+        db = my.connect(host="localhost",user= "root", passwd=password, database=database)
+        cursor = db.cursor()
+        cursor.execute("DROP TABLE IF EXISTS ROLLNAMESGPA") #drops these table sif they exists
+        cursor.execute("DROP TABLE IF EXISTS SUBCODENAME")
+        sql1 = "CREATE TABLE ROLLNAMESGPA("+ self.asd +" VARCHAR(20),NAME VARCHAR(60),SGPA VARCHAR(20))"#create table with rollno,name and SGPA
+        sql2 = "CREATE TABLE SUBCODENAME(SUBCODE VARCHAR(20),SUBNAME VARCHAR(60))"  #create table subjectcode and subject name
+
+        cursor.execute(sql1)
+        cursor.execute(sql2)
+
+
+        for X in range(0,len(self.sub_code_list_1)):
+            strs = "f_"
+            x = ""
+            y = ""
+            x = self.sub_code_list_1[X]
+            x = x.replace(" ", "_")
+            y = self.sub_name_list_1[X]
+            y = y.replace(" ", "_")
+            strs += x
+            strs += y
+
+            strs.strip()
+            self.table_names.append(strs)
+            cursor.execute("DROP TABLE IF EXISTS "+strs)
+            sql = "CREATE TABLE "+strs+"(NAME VARCHAR(60),Marks VARCHAR(60))"
+            cursor.execute(sql)
+            db.commit()
+
+
+
+        db.close()
+
+    #insert Data into Tables
+    def insert_into_table(self):
+        db = my.connect(host="localhost",user= "root", passwd=password, database="abc")
+        cursor = db.cursor()
+        sql = "INSERT INTO ROLLNAMESGPA ("+self.asd+",NAME,SGPA) VALUES (%s,%s,%s)"
+        cursor.executemany(sql, self.roll_name_sgpa)
+        db.commit()
+
+        sql = "INSERT INTO SUBCODENAME (SUBCODE,SUBNAME) VALUES (%s,%s)"
+        cursor.executemany(sql, self.code_name)
+        db.commit()
+
+
+        for X in range(0,len(self.sub_code_list_1)):
+            strs = "f_"
+            x = ""
+            y = ""
+            x = self.sub_code_list_1[X]
+            x = x.replace(" ","_")
+            y = self.sub_name_list_1[X]
+            y = y.replace(" ", "_")
+            strs += x
+            strs += y
+
+            strs.strip()
+
+            sql = "INSERT INTO "+ strs +"(NAME, Marks) VALUES (%s,%s)"
+            cursor.executemany(sql, self.sub[X])
+        db.commit()
+
+
+        db.close()
+
+
+
+
+
+
+    # returns Roll Number
+    def get_no(self, data):
+        flag = 1
+        this_no = ' '
+        while flag == 1:
+            while data[self.ptr] != self.sample[0]:  # increment pointer till We did'nt get S
+                self.ptr += 1
+                if self.ptr == len(data):       #if pointer returns end of page
+                    return -1
+            if data[self.ptr + 1] == self.sample[1] and data[self.ptr + 2] == self.sample[2]:
+                flag = 0  # we got S15 and break
+                break;
+            else:
+                self.ptr += 1
+        while data[self.ptr] != ' ':  # incrementing till we didn't get space
+            this_no += data[self.ptr]  # and storing that values in in this_no
+            self.ptr += 1
+        return this_no  # returning this_no i.e Roll Number
+
+    # return Name of Particular Student
+    def get_name(self, data):
+        this_name = ''  # variable to store name
+        while data[self.ptr] == ' ':  # increment till all space is over
+            self.ptr += 1
+        while data[self.ptr] != ' ':  # store first name
+            this_name += data[self.ptr]
+            self.ptr += 1
+        this_name += data[self.ptr]  # adding first space after first name
+        self.ptr += 1
+
+        while data[self.ptr] != ' ':  # insert middle name till second space
+            this_name += data[self.ptr]
+            self.ptr += 1
+        this_name += data[self.ptr]  # add second space after second name
+        self.ptr += 1
+
+        while data[self.ptr] != ' ':  # increment till third space
+            this_name += data[self.ptr]  # add (third) surname name in variable
+            self.ptr += 1
+        this_name += data[self.ptr]  # add space after third Name
+        return this_name  # return Name
+
+    # Gives Marks of subject Code
+    def get_marks(self, data, sub_code):
+        flag = 1
+        marks = ' '
+        dummy_ptr = self.ptr
+        while flag == 1:
+            while data[self.ptr] != sub_code[0]:  # comparing With Subject Code
+                self.ptr += 1
+                if (self.ptr + 3) == len(data) or (  #returns -1 if we encounter length end of page
+                        data[self.ptr] == 'S' and data[self.ptr + 1] == 'G' and data[self.ptr + 2] == 'P' and data[
+                    self.ptr + 3] == 'A'):
+                    self.ptr = dummy_ptr
+                    return -1
+            flag1 = 0
+            for i in range(1, len(sub_code)):
+                if data[self.ptr + i] == sub_code[i]:
+                    flag1 += 1
+            if flag1 == (len(sub_code) - 1):
+                flag = 0
+                break;
+            else:
+                self.ptr += 1
+        while data[self.ptr] != ' ':  # shifting till we didn't Get the Space after Subject Code
+            self.ptr += 1
+        for dd in range(0, 6):  # Shifting 6 Coloumns (Having Space And Data)
+            while data[self.ptr] == ' ' or data[self.ptr] == '*':
+                self.ptr += 1;
+            while data[self.ptr] != ' ':
+                self.ptr += 1;
+        while data[self.ptr] == ' ':
+            self.ptr += 1
+        while data[self.ptr] != ' ':  # fetching Marks till we get space
+            marks += data[self.ptr]
+            self.ptr += 1
+        if (self.sample[0] == 'F'):
+            self.ptr = dummy_ptr
+        return marks  # return Marks
+
+    #returns SGPA
+    def get_SGPA(self, data):
+        flag = 1
+        this_sgpa = ' '
+        while flag == 1:
+            while data[self.ptr] != self.sgpa_string[0]:  # increment pointer till We did'nt get S
+                self.ptr += 1
+                if self.ptr == len(data):
+                    return -1
+            if data[self.ptr + 1] == self.sgpa_string[1] and data[self.ptr + 2] == self.sgpa_string[2] and data[self.ptr + 3] == \
+                    self.sgpa_string[3]:
+                flag = 0  # we got SGPA and break
+                self.ptr = self.ptr + 7
+                break;
+            else:
+                self.ptr += 1
+
+        while data[self.ptr] != ',':  # incrementing till we didn't get space
+            this_sgpa += data[self.ptr]  # and storing that values in in this_no
+            self.ptr += 1
+
+        return this_sgpa
+
+
+
+    def compute_result(self,sub_code,sub_name):
+
+        return
+
+    #does the overall result seggregation of passed and failed students in two list boxes
+    def pressed1(self):
+        self.frame.place(x=10, y=40)#place frame of passed students
+        self.frame_fail.place(x=450, y=80)#place frame of failed students
+
+        self.result_l.place(x=450, y=400) #place result label
+        self.result_t.place(x=560, y=400) #place result text
+        self.avg_l.place(x=450, y=450)    #place average label
+        self.avg_t.place(x=560, y=450)    #place average text
+
+
+        db = my.connect(host="localhost", user="root", passwd=password, database="abc")
+        cursor = db.cursor()
+
+        # symbol = "--"
+        a = "ROLLNAMESGPA"
+        sql = "SELECT * FROM " + a + " ORDER BY SGPA DESC" #query to order by SGPA
+        passed = 0#count of total passed students
+        total = 0#count of total students
+        flag = 1
+        self.listbox.delete(0, END)#deleting the content in listbox of passed students
+        self.listbox.update()
+        self.listbox_fail.delete(0, END)#deleting the content in listbox of failed students
+        self.listbox_fail.update()
+        try:
+
+            cursor.execute(sql)
+
+            results = cursor.fetchall()#fetching whole query result at once
+            sum_marks = 0
+            for row in results:
+                roll_number = row[0]#roll number of student
+                name = row[1]       #name of Student
+                marks = row[2]      #marks of Student
+                print("Error7")
+                if "-" not in marks:    #if Student is not Failed
+                    passed += 1
+                    sum_marks += float(marks)
+                total += 1
+                # while len(roll_number) < 40:
+                #   roll_number += "-"
+                if "-" in marks:        #if - found in marks then insert it in failed student list box
+                    self.listbox_fail.insert(END, roll_number + " " + name + " -" + marks)
+                elif "10" in marks:     #if any student has 10 SGPA then insert it at top
+                    self.listbox.insert(0, roll_number + " " + name + " -" + marks)
+
+                else:                   #else insert student at end
+                    self.listbox.insert(END, roll_number + " " + name + " -" + marks)
+                # print("roll_number=%s,marks=%s" % (roll_number, marks))
+        except:
+            print("Error: unable to fetch data")
+            flag = 0
+
+        # disconnect from server
+        if (flag):      #if data is correctly fetched
+            # self.listbox_top.insert(END, roll_number + "  " + marks)
+
+            print(passed)
+            print(total)
+            print((passed / total) * 100)
+            self.get_result == -1
+            #clear the inital text in result text
+            self.result_t.delete(1.0, END)
+            self.result_t.update()
+            self.result_t.insert(END, round((passed / total) * 100, 2))
+            #clear the initial text in average text
+            self.avg_t.delete(1.0, END)
+            self.avg_t.update()
+            self.avg_t.insert(END, round((sum_marks / passed)))
+        db.close()
+
+    #does the subjectwise result seggregation of passed and failed students in two list boxes
+    def pressed2(self):
+        self.get_result = self.combo.current()
+        self.frame.place(x=10, y=40)  # place frame of passed students
+        self.frame_fail.place(x=450, y=80)  # place frame of failed students
+
+        self.result_l.place(x=450, y=400)  # place result label
+        self.result_t.place(x=560, y=400)  # place result text
+        self.avg_l.place(x=450, y=450)  # place average label
+        self.avg_t.place(x=560, y=450)  # place average text
+        db = my.connect(host="localhost", user="root", passwd=password, database="abc")
+        cursor = db.cursor()
+
+        # symbol = "--"
+        sql = "SELECT * FROM f_" + self.sub_code_list_1[self.get_result] + self.sub_name_list_1[
+            self.get_result] + " ORDER BY Marks DESC"
+        passed = 0
+        total = 0
+        flag = 1
+        #delete intial text present in  list box of passed students and failed students
+        self.listbox.delete(0, END)
+        self.listbox.update()
+        self.listbox_fail.delete(0, END)
+        self.listbox_fail.update()
+        try:
+            cursor.execute(sql)
+            results = cursor.fetchall()
+            sum_marks = 0
+            for row in results:
+                roll_number = row[0]  #fetch rollno
+
+                marks = row[1]         #fetch marks
+                if "F" not in marks:    #F indicates student is failed in that subject
+                    passed += 1
+                    if "P" not in marks:
+                        sum_marks += float(marks)
+                total += 1
+                while len(roll_number) < 40: #adding ---(dashes)
+                    roll_number += "-"
+                if "F" in marks:        #if Fpresent in marks insert it into failed students listbox
+                    self.listbox.insert(END, roll_number + "-" + marks)
+                    self.listbox_fail.insert(END, roll_number + "-" + marks)
+                elif "100" in marks:    #if any student gets 100 insert them to TOP
+                    self.listbox.insert(0, roll_number + "-" + marks)
+
+                else:                   #else insert data at current endpoition
+                    self.listbox.insert(ACTIVE, roll_number + "          " + marks)
+                print("roll_number=%s,marks=%s" % (roll_number, marks))
+        except:
+            print("Error: unable to fecth data")
+            flag = 0
+
+        # disconnect from server
+        if (flag):
+            # self.listbox_top.insert(END, roll_number + "  " + marks)
+
+            print(passed)
+            print(total)
+            print((passed / total) * 100)
+            self.get_result == -1
+
+            self.result_t.delete(1.0, END)
+            self.result_t.update()
+            self.result_t.insert(END, round((passed / total) * 100, 2))
+
+            self.avg_t.delete(1.0, END)
+            self.avg_t.update()
+            self.avg_t.insert(END, round((sum_marks / passed)))
+        db.close()
+
+    #calculates the subjectwise  result and draws the bar graph
+    def pressed3(self):
+        db = my.connect(host="localhost", user="root", passwd=password, database="abc")
+
+        cursor = db.cursor()
+        for ind in range(0,len(self.sub_name_list_1)):
+            #print(ind)
+            self.get_result = ind  #inserting subjecct index from 0 to total number of subjects
+
+
+            sql = "SELECT * FROM f_" + self.sub_code_list_1[self.get_result] + self.sub_name_list_1[
+                self.get_result]+""
+            passed = 0
+            total = 0
+            flag = 1
+            #try:
+            cursor.execute(sql)
+            results = cursor.fetchall()
+            sum_marks = 0
+            print("f_"+ self.sub_code_list_1[self.get_result] + self.sub_name_list_1[
+            self.get_result])
+            for row in results:
+                roll_number = row[0]    #fetch rollno and marks
+                marks = row[1]
+                if "F" not in marks:
+                  passed += 1
+                  if "P" not in marks:
+                        sum_marks += float(marks)
+                total += 1
+                    #time.sleep(0.1)
+
+            if(flag):
+
+                print(passed)
+                print(total)
+                #print((passed / total) * 100)
+                sub_result = round((passed / total) * 100,2)
+                self.result_list.append(sub_result)
+
+
+        #plottng Bar Graph
+        db.close()
+        y_pos = range(len(self.sub_name_list_1))#y_pos has  no of total subjects
+        plt.bar(y_pos, self.result_list)#result_list is list for storing the Result of each subject in percentage
+        plt.legend()
+        plt.xlabel("Subjects")#XLabel or X-heading
+        plt.ylabel("Percentage Student Passed")#Y Label or Y Heading
+        plt.xticks(y_pos, self.sub_name_list_1, rotation=90)#Names of Subjects on X-Axis
+        plt.show("1920x1080")
+        self.result_list.clear()
+
+
+    #Does the GUI construction of Second Window
+    def new_window(self):
+
+        self.top = Toplevel() #Creating Second  GUI Window
+
+        # Whole College BackGround Image
+        photo = PhotoImage(file='C:\\Users\\Lenovo\\Desktop\\images\\pccoeimage2.png')
+        label = Label(self.top,image=photo)
+        label.image = photo
+        label.place(x=0, y=0)
+
+
+        v = self.sub_name_list_1   #Stores the Name of subjects
+
+        #ComboBox for Selecting the Name of Subjects
+        self.combo = Combobox(self.top, values=v, height=10, width=40)
+        self.combo.set("SELECT HERE")
+        self.combo.place(x = 450, y = 10)
+
+        #listbox and Scrollbar for displaying Passed Students
+        self.frame = Frame(self.top)
+        self.scroll = Scrollbar(self.frame)
+        self.scroll.pack(side=RIGHT, fill=Y)
+        self.listbox = Listbox(self.frame, yscrollcommand=self.scroll.set, width=60, height=30)
+        self.listbox.pack(side=LEFT)
+        self.scroll.config(command=self.listbox.yview)
+
+
+
+        #ListBox and ScrollBar for Displaying Failed Students
+        self.frame_fail = Frame(self.top)
+        self.scroll_fail = Scrollbar(self.frame_fail)
+        self.scroll_fail.pack(side=RIGHT, fill=Y)
+        self.listbox_fail = Listbox(self.frame_fail, yscrollcommand=self.scroll_fail.set, width=50, height=15)
+        self.listbox_fail.pack(side=LEFT)
+        self.scroll_fail.config(command=self.listbox_fail.yview)
+
+
+        #does the  segreggation  of students based SGPA
+        button_get_result = Button(self.top, text="Show OVERALL RESULT", command=self.pressed1)
+        button_get_result.place(x=10, y=10)
+
+        # does the  segreggation  of students based on subject
+        button_get_result = Button(self.top, text="Get Result", command=self.pressed2)
+        button_get_result.place(x=550, y=40)
+
+        self.visualisation = Button(self.top, text="Visualisation", command=self.pressed3)
+        self.visualisation.place(x=1000, y=10)
+
+        # label and text to show Percentage Result
+        self.result_l = Label(self.top, text="Result")
+        self.result_t = Text(self.top,width = 10 ,height = 2)
+
+
+        #label and text to show average score
+        self.avg_l = Label(self.top, text="Average Score")
+        self.avg_t = Text(self.top,width = 10 ,height = 2)
+
+
+        self.top.geometry("1300x700")
+        self.top.mainloop()
+        self.top.title("PIMPRI CHINCHWAD COLLEGE OF ENGINEERING - Result Analyzer")#Title of Window
+
+    #takes I/p of three fields and Gives Call for Diferent Functions
+    def initialisation(self):
+
+        self.pdf_path_string = self.pdfPath_e.get()  #takes PDF Path
+        self.identifcationMark_string = self.identificationMark_e.get() #takes Identification Mark
+        self.subjectFilePath_string = self.subjectFilePath_e.get()  #takes Files path
+        self.sgpa_string = 'SGPA'                                   #stores SGPA in sgpa_string
+
+        #warning messages if any of the value 3 values are not mention
+        if self.pdf_path_string == "":
+            messagebox.showwarning("Warning","PDF Path")
+        if self.identifcationMark_string == "":
+            messagebox.showwarning("Warning","Identification String")
+        if self.subjectFilePath_string == "":
+            messagebox.showwarning("Warning","Subject-FILE Path")
+
+        
+
+        self.sample = self.identifcationMark_string #smples stores the identification mark
+
+
+        self.open_readfile()
+
+        self.read_PDF_details()
+
+        self.createTable()
+
+        self.insert_into_table()
+
+        self.new_window()
+
+
+    #Contains the GUI And Input output Regarding 1st GUI window
+    def __init__(self,master):
+        #self.copyr = "Made with ♥ by Akash and Bhavit";
+        self.copyr = "Made by Akash and Bhavit";
+
+
+
+        #label and entry boxes for PdfPath
+        self.pdfPath_l = Label(master, text="PDF PATH")
+        self.pdfPath_l.place(x=500, y=200)
+        self.pdfPath_e = Entry(master)
+        #self.pdfPath_e.insert(END,"G:\\data.pdf")
+        self.pdfPath_e.place(x=650, y=200)
+
+
+        #label and entry boxes for identificationMark
+        self.identifcationMark_l = Label(master, text="Identification Mark")
+        self.identifcationMark_l.place(x=500, y=240)
+        self.identificationMark_e = Entry(master)
+        #self.identificationMark_e.insert(END, "S15")
+        self.identificationMark_e.place(x=650, y=240)
+
+
+        #label and entry boxes for File having SubjectNames and Subject Codes
+        self.subjectFilePath_l = Label(master, text="SUBJECT PATH")
+        self.subjectFilePath_l.place(x=500, y=280)
+        self.subjectFilePath_e = Entry(master)
+        #self.subjectFilePath_e.insert(END, "G:\\demo.txt")
+        self.subjectFilePath_e.place(x=650, y=280)
+
+
+        #for Displaying Pccoe Image
+        photo = PhotoImage(file = 'C:\\Users\\Lenovo\\Desktop\\images\\PCCOELOGO1.png')
+        label = Label(image = photo)
+        label.image = photo
+        label.place(x = 0, y = 0)
+
+        #Opens new Window
+        button1 = Button(master, text="Proceed ", command=self.initialisation)
+        button1.place(x = 630, y = 320)
+
+        #label to display names of developers
+        self.msg_l = Label(master, text=self.copyr)
+        self.msg_l.place(x=1080, y=630)
+
+
+
+
+root = Tk()
+obj = resultAnalysis(root)    #passinf root to class constructor.
+root.geometry("1920x1080")
+root.title("PIMPRI CHINCHWAD COLLEGE OF ENGINEERING - Result Analyzer")#Title of Window
+#root.configure(bg = "#fafbff")
+root.mainloop()
